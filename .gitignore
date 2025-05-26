@@ -1,0 +1,17 @@
+# Byte‐compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+
+# Qdrant data directory
+qdrant_data/
+
+# Local temporary files
+/tmp/*
+
+# Docker
+docker-compose.override.yml
+
+
+venv/
