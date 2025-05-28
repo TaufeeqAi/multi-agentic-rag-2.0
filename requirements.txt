@@ -6,3 +6,8 @@ streamlit
 groq
 pdfplumber
 qdrant-client
+sentence_transformers
+langchain
+dotenv
+agno
+requests

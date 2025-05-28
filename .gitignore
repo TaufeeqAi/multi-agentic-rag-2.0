@@ -2,16 +2,19 @@
 __pycache__/
 *.py[cod]
 *$py.class
-
+multi_agentic_rag.egg-info/
 
 # Qdrant data directory
 qdrant_data/
+qdrant_storage/
+data/
 
 # Local temporary files
 /tmp/*
 
+
 # Docker
 docker-compose.override.yml
 
-
+logs/
 venv/
