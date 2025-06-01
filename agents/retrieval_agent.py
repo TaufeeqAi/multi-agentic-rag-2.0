@@ -1,5 +1,5 @@
 import logging
-from typing import List, Dict
+from typing import List, Dict, Optional
 from agno.agent import Agent
 from sentence_transformers import SentenceTransformer
 from qdrant_client import QdrantClient
@@ -7,8 +7,14 @@ from common.exception import AppException
 from common.logging import logger
 
 class RetrievalAgent(Agent):
-    def __init__(self, collection_name: str = "pdf_chunks"):
+    def __init__(self, 
+                collection_name: str = "pdf_chunks",
+                qdrant_client: Optional[QdrantClient] = None,
+                 
+    ):
         self.collection_name = collection_name
+
+        
 
         super().__init__(
             name="Semantic Retrieval Agent",
@@ -20,12 +26,21 @@ class RetrievalAgent(Agent):
             ]
         )
 
-        # 1. Initialize Qdrant client
-        try:
-            self.qdrant_client = QdrantClient(url="localhost:6334", prefer_grpc=True)
-        except Exception as e:
-            raise AppException("RetrievalAgent: Unable to connect to Qdrant", error_detail=e)
-
+        if qdrant_client is not None:
+            self.qdrant_client = qdrant_client
+        else:
+            try:
+                # Attempt to read from environment, e.g. QDRANT_HOST and QDRANT_PORT
+                import os
+                host = os.getenv("QDRANT_HOST", "localhost")
+                port = int(os.getenv("QDRANT_PORT", "6334"))
+                self.qdrant_client = QdrantClient(host=host, port=port, prefer_grpc=True)
+            except Exception as e:
+                raise AppException(
+                    "RetrievalAgent: Unable to connect to Qdrant",
+                    error_detail=e,
+                    status_code=500
+                )
         # 2. Initialize embedding model (same as VectorEmbeddingAgent)
         try:
             self.embedding_model = SentenceTransformer("all-MiniLM-L6-v2")

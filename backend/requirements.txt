@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+sqlalchemy
+pydantic
+groq
+pdfplumber
+qdrant-client
+sentence_transformers
+langchain
+dotenv
+agno

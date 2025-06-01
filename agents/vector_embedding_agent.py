@@ -1,6 +1,6 @@
 import logging
 import uuid
-from typing import List, Dict
+from typing import List, Dict,Optional
 from agno.agent import Agent
 from qdrant_client import QdrantClient
 from qdrant_client.http.models import PointStruct, VectorParams
@@ -13,9 +13,10 @@ from common.logging import logger
 
 class VectorEmbeddingAgent(Agent):
 
-    def __init__(self, collection_name: str = "pdf_chunks"):
+    def __init__(self, collection_name: str = "pdf_chunks",qdrant_client: Optional[QdrantClient] = None,):
         self.collection_name = collection_name
-
+        self._collection_checked = False
+        
         super().__init__(
             name="Vector Embedding Agent",
             role="Chunk text and embed with SentenceTransformer, then store in Qdrant.",
@@ -27,38 +28,54 @@ class VectorEmbeddingAgent(Agent):
             ]
         )
 
-
-        # 1. Initialize Qdrant client
-        try:
-            self.qdrant_client = QdrantClient(host="localhost", port=6333)
-        except Exception as e:
-            raise AppException("VectorEmbeddingAgent: Failed to connect to Qdrant", error_detail=e)
-
-        # 2. Initialize embedding model (384-dimensional vectors)
+        if qdrant_client is not None:
+            self.qdrant_client = qdrant_client
+        else:
+            try:
+                import os
+                host = os.getenv("QDRANT_HOST", "localhost")
+                port = int(os.getenv("QDRANT_PORT", "6334"))
+                self.qdrant_client = QdrantClient(host=host, port=port, prefer_grpc=True)
+            except Exception as e:
+                raise AppException(
+                    "VectorEmbeddingAgent: Unable to connect to Qdrant",
+                    error_detail=e,
+                    status_code=500
+                )
+            
         try:
             self.embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
         except Exception as e:
-            raise AppException("VectorEmbeddingAgent: Failed to load SentenceTransformer model", error_detail=e)
-
-        # 3. Ensure the collection exists (create if not)
-        try:
-            exists = self.qdrant_client.collection_exists(self.collection_name)
-
-            if not exists:
-                # Create with 384 dimensions and cosine distance
-                self.qdrant_client.create_collection(
-                    collection_name=self.collection_name,
-                    vectors_config=VectorParams(size=384, distance="Cosine"),
-                )
-                logger.info(f"Created Qdrant collection '{self.collection_name}' with 384 dim, Cosine.")
-            else:
-                logger.info(f"Qdrant collection '{self.collection_name}' already exists.")
-        except Exception as e:
             raise AppException(
-                f"VectorEmbeddingAgent: Error ensuring Qdrant collection '{collection_name}'", error_detail=e
+                "VectorEmbeddingAgent: Unable to load SentenceTransformer model",
+                error_detail=e,
+                status_code=500
             )
 
+    def _ensure_collection(self):
+        if not self._collection_checked:
+            # Attempt to create or verify the collection, with a try/except
+            try:
+                exists = self.qdrant_client.collection_exists(self.collection_name)
+                if not exists:
+                    self.qdrant_client.create_collection(
+                        collection_name=self.collection_name,
+                        vectors_config=VectorParams(size=384, distance="Cosine"),
+                        )
+                    logger.info(f"Created Qdrant collection '{self.collection_name}' with 384 dim, Cosine.")
+                else:
+                    logger.info(f"Qdrant collection '{self.collection_name}' already exists.")
+            except Exception as e:
+                raise AppException(
+                    f"VectorEmbeddingAgent: Error ensuring Qdrant collection '{self.collection_name}'", status_code=500 ,error_detail=e
+                )
+            finally:
+                self._collection_checked = True
+
+
+
     def run(self, pages_data: List[Dict], batch_size: int = 64) -> Dict:
+        self._ensure_collection()
         if not isinstance(pages_data, list) or len(pages_data) == 0:
             raise AppException("VectorEmbeddingAgent.run: pages_data must be a non-empty list")
 

@@ -10,7 +10,7 @@ from common.logging import logger
 class LLMAgent(Agent):
     def __init__(
         self,
-        model_name: str = "llama-3.3-70b-versatile",
+        model_name: str = "meta-llama/llama-4-scout-17b-16e-instruct",
         temperature: float = 0.5,
         
     ):
@@ -67,7 +67,11 @@ class LLMAgent(Agent):
             answer = response.content.strip()
         except Exception as e:
             logger.error("Failed to generate a response", e)
-            raise AppException("Failed to generate answer", e)
+            raise AppException(
+                message="Failed to generate answer", 
+                status_code=500,
+                error_detail=e
+        )
 
         return {"answer": answer}
 

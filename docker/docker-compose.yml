@@ -1,0 +1,59 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# docker-compose.yml
+#
+# Defines three services:
+#   1) qdrant       → the vector database
+#   2) api          → the FastAPI backend
+#   3) streamlit    → the Streamlit frontend
+# ──────────────────────────────────────────────────────────────────────────────
+
+services:
+  # ────────────────────────────────────────────────────────────
+  # 1) Qdrant vector database
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: qdrant
+    ports:
+      - "6334:6334"   # gRPC port
+      - "6333:6333"   # HTTP API port (optional)
+    volumes:
+      - qdrant_data:/qdrant/storage
+    restart: unless-stopped
+
+  # ────────────────────────────────────────────────────────────
+  # 2) FastAPI backend
+  api:
+    build:
+      context: ../                # project-root is the build context
+      dockerfile: docker/Dockerfile.api
+    container_name: rag_api
+    depends_on:
+      - qdrant
+    environment:
+      # Tell the backend to connect to Qdrant via the compose service hostname “qdrant”
+      QDRANT_HOST: qdrant
+      QDRANT_PORT: "6334"
+      # Load GROQ_API_KEY from the host .env
+      GROQ_API_KEY: "${GROQ_API_KEY:-}"
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+  # ────────────────────────────────────────────────────────────
+  # 3) Streamlit frontend
+  streamlit:
+    build:
+      context: ../
+      dockerfile: docker/Dockerfile.streamlit
+    container_name: rag_streamlit
+    depends_on:
+      - api
+    environment:
+      # Tell Streamlit to call “api” by service name, not localhost
+      API_BASE: "http://api:8000"
+    ports:
+      - "8501:8501"
+    restart: unless-stopped
+
+volumes:
+  qdrant_data:
