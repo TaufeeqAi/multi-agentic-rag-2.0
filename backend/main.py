@@ -150,5 +150,8 @@ async def get_status():
         logger.error("Unexpected Qdrant error in /status: %s", e)
         raise AppException("Error fetching Qdrant status", status_code=500)
     except Exception as e:
+        text = str(e)
+        if "Collection `pdf_chunks` doesn't exist" in text:
+            return {"count": 0}
         logger.error("Error fetching Qdrant status: %s", e)
         raise AppException("Error fetching Qdrant status", status_code=500)
